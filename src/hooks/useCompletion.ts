@@ -917,10 +917,11 @@ export const useCompletion = () => {
   }, [handleScreenshotSubmit]);
 
   useEffect(() => {
-    let unlisten: any;
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
 
     const setupListener = async () => {
-      unlisten = await listen("captured-selection", async (event: any) => {
+      const fn = await listen("captured-selection", async (event: any) => {
         if (!screenshotInitiatedByThisContext.current) {
           return;
         }
@@ -951,11 +952,18 @@ export const useCompletion = () => {
           }, 100);
         }
       });
+      // If cleanup already ran before the listener resolved, unregister immediately
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     };
 
     setupListener();
 
     return () => {
+      cancelled = true;
       if (unlisten) {
         unlisten();
       }
@@ -963,14 +971,20 @@ export const useCompletion = () => {
   }, [handleScreenshotSubmit]);
 
   useEffect(() => {
-    const unlisten = listen("capture-closed", () => {
+    let unlisten: (() => void) | undefined;
+
+    listen("capture-closed", () => {
       setIsScreenshotLoading(false);
       isProcessingScreenshotRef.current = false;
       screenshotInitiatedByThisContext.current = false;
+    }).then((fn) => {
+      unlisten = fn;
     });
 
     return () => {
-      unlisten.then((fn) => fn());
+      if (unlisten) {
+        unlisten();
+      }
     };
   }, []);
 

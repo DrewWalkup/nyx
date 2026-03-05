@@ -10,13 +10,14 @@ import { TYPE_PROVIDER } from "@/types";
 import curl2Json from "@bany/curl-to-json";
 import { shouldUseNyxAPI } from "./nyx.api";
 
-// Nyx STT function
-async function fetchNyxSTT(audio: File | Blob): Promise<string> {
+export interface STTResult {
+	transcription: string | null;
+}
+
+async function fetchNyxSTT(audio: File | Blob): Promise<STTResult> {
 	try {
-		// Convert audio to base64
 		const audioBase64 = await blobToBase64(audio);
 
-		// Call Tauri command
 		const response = await invoke<{
 			success: boolean;
 			transcription?: string;
@@ -26,14 +27,14 @@ async function fetchNyxSTT(audio: File | Blob): Promise<string> {
 		});
 
 		if (response.success && response.transcription) {
-			return response.transcription;
+			return { transcription: response.transcription };
 		} else {
-			return response.error || "Transcription failed";
+			throw new Error(response.error || "Transcription failed");
 		}
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
-		return `Nyx STT Error: ${errorMessage}`;
+		throw new Error(`Nyx STT Error: ${errorMessage}`);
 	}
 }
 
@@ -48,11 +49,12 @@ export interface STTParams {
 }
 
 /**
- * Transcribes audio and returns either the transcription or an error/warning message as a single string.
+ * Transcribes audio and returns a structured result.
+ * - `{ transcription: "text" }` when speech was detected
+ * - `{ transcription: null }` when no speech was detected
+ * - Throws on errors (network, provider, config)
  */
-export async function fetchSTT(params: STTParams): Promise<string> {
-	let warnings: string[] = [];
-
+export async function fetchSTT(params: STTParams): Promise<STTResult> {
 	try {
 		const { provider, selectedProvider, audio } = params;
 
@@ -94,7 +96,7 @@ export async function fetchSTT(params: STTParams): Promise<string> {
 					([key, value]) => [key.toUpperCase(), value],
 				),
 			),
-			...(params.language ? { LANGUAGE: params.language } : {}),
+			...(params.language && params.language !== "auto" ? { LANGUAGE: params.language } : {}),
 		};
 
 		// Prepare request
@@ -142,7 +144,7 @@ export async function fetchSTT(params: STTParams): Promise<string> {
 				type: audio.type,
 			});
 			form.append("file", freshBlob, "audio.wav");
-			if (params.language) {
+			if (params.language && params.language !== "auto") {
 				form.append("language", params.language);
 			}
 			const headerKeys = Object.keys(headers).map((k) =>
@@ -238,9 +240,8 @@ export async function fetchSTT(params: STTParams): Promise<string> {
 		try {
 			data = JSON.parse(responseText);
 		} catch {
-			return [...warnings, responseText.trim()]
-				.filter(Boolean)
-				.join("; ");
+			const rawTranscription = responseText.trim();
+			return { transcription: rawTranscription || null };
 		}
 
 		// Extract transcription
@@ -249,11 +250,10 @@ export async function fetchSTT(params: STTParams): Promise<string> {
 		const transcription = (getByPath(data, path) || "").trim();
 
 		if (!transcription) {
-			return [...warnings, "No transcription found"].join("; ");
+			return { transcription: null };
 		}
 
-		// Return transcription with any warnings
-		return [...warnings, transcription].filter(Boolean).join("; ");
+		return { transcription };
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
 		throw new Error(msg);

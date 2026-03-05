@@ -316,9 +316,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 		safeLocalStorage.setItem(STORAGE_KEYS.SUPPORTS_IMAGES, String(value));
 	};
 
-	// STT language preference — persisted, defaults to "" (auto-detect)
+	// STT language preference — persisted, defaults to "auto" (provider auto-detect)
 	const [sttLanguage, setSttLanguageState] = useState<string>(() => {
-		return safeLocalStorage.getItem(STORAGE_KEYS.STT_LANGUAGE) || "";
+		return safeLocalStorage.getItem(STORAGE_KEYS.STT_LANGUAGE) || "auto";
 	});
 
 	const setSttLanguage = (language: string) => {

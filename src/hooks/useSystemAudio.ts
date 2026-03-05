@@ -11,7 +11,7 @@ import { useWindowResize, useGlobalShortcuts } from ".";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useApp } from "@/contexts";
-import { fetchSTT, fetchAIResponse } from "@/lib/functions";
+import { fetchSTT, fetchAIResponse, type STTResult } from "@/lib/functions";
 import {
 	DEFAULT_QUICK_ACTIONS,
 	DEFAULT_SYSTEM_PROMPT,
@@ -323,7 +323,7 @@ export function useSystemAudio() {
 								language: sttLanguage,
 							});
 
-							const timeoutPromise = new Promise<string>(
+							const timeoutPromise = new Promise<STTResult>(
 								(_, reject) => {
 									setTimeout(
 										() =>
@@ -338,22 +338,22 @@ export function useSystemAudio() {
 							);
 
 							try {
-								const transcription = await Promise.race([
+								const sttResult = await Promise.race([
 									sttPromise,
 									timeoutPromise,
 								]);
 
-								if (transcription.trim()) {
+								if (sttResult.transcription) {
 									// Skip duplicate transcriptions from VAD double-fires
-									if (isDuplicateTranscription(transcription.trim())) {
+									if (isDuplicateTranscription(sttResult.transcription)) {
 										console.debug(
 											"Skipping duplicate transcription:",
-											transcription.trim().substring(0, 50),
+											sttResult.transcription.substring(0, 50),
 										);
 										return;
 									}
 
-									setLastTranscription(transcription);
+									setLastTranscription(sttResult.transcription);
 									setError("");
 
 									const effectiveSystemPrompt =
@@ -372,12 +372,12 @@ export function useSystemAudio() {
 										});
 
 									await processWithAI(
-										transcription,
+										sttResult.transcription,
 										effectiveSystemPrompt,
 										previousMessages,
 									);
 								} else {
-									setError("Received empty transcription");
+									console.debug("VAD triggered but no speech detected, discarding");
 								}
 							} catch (sttError: any) {
 								console.error("STT Error:", sttError);

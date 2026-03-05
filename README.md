@@ -1,6 +1,6 @@
 # Nyx
 
----
+<div align="center">
 
 [![Open Source](https://img.shields.io/badge/Open%20Source-❤️-blue)](https://github.com/DrewWalkup/pluely)
 [![Tauri](https://img.shields.io/badge/Built%20with-Tauri-orange)](https://tauri.app/)
@@ -13,11 +13,11 @@
 
 </div>
 
-> **An Open Source Alternative to Cluely** - A lightning-fast, privacy-first AI assistant that works seamlessly during meetings, interviews, and conversations.
-
 ---
 
 ## ⚡ **The Ultimate Lightweight AI Companion**
+
+> A lightning-fast, privacy-first AI assistant that works seamlessly during meetings, interviews, and conversations.
 
 <div align="center">
 
@@ -32,19 +32,6 @@
 |   **50% less compute power** usage   |      Perfect transparency level       |       Ready when you need it most       |
 
 </div>
-
-#### 📊 **Nyx vs Original Cluely**
-
-|       Feature       |    🟢 **Nyx (Open Source)**     |      🔴 **Original Cluely**       |
-| :-----------------: | :-----------------------------: | :-------------------------------: |
-|    **App Size**     |          **~10MB** ⚡           |           **~270MB** 🐌           |
-| **Size Difference** |       **27x Smaller** 🪶        | Bloated with unnecessary overhead |
-|  **Compute Usage**  |     **50% Less CPU/RAM** 💚     |    Heavy resource consumption     |
-|  **Startup Time**   |          **<100ms** ⚡          |          Several seconds          |
-|     **Privacy**     | **100% Local with your LLM** 🔒 |       Data sent to servers        |
-|      **Cost**       |    **Free & Open Source** 💝    |    **$15M company pricing** 💸    |
-
----
 
 # Features
 
@@ -544,21 +531,12 @@ Screenshot Settings (/screenshot in sidebar)
 
 Testing Each Feature
 
-┌────────────────────────────┬────────────────────────────────────────────┬─────────────────────────────────────────┐
-│ Feature │ How to trigger │ Requires │
-├────────────────────────────┼────────────────────────────────────────────┼─────────────────────────────────────────┤
-│ Mic button (completion │ Click mic icon or Cmd+Shift+A │ STT provider configured │
-│ bar) │ │ │
-├────────────────────────────┼────────────────────────────────────────────┼─────────────────────────────────────────┤
-│ System audio daemon │ Click toggle in completion bar or │ Nothing — just works │
-│ │ Cmd+Shift+M │ │
-├────────────────────────────┼────────────────────────────────────────────┼─────────────────────────────────────────┤
-│ Screenshot + audio │ Take screenshot while daemon is on │ Screenshot + daemon enabled │
-├────────────────────────────┼────────────────────────────────────────────┼─────────────────────────────────────────┤
-│ Chat audio recording │ Open a chat → click mic icon in input area │ STT provider configured │
-├────────────────────────────┼────────────────────────────────────────────┼─────────────────────────────────────────┤
-│ VAD auto-record │ Enable in speech panel's mode switcher │ STT provider + system audio output │
-│ │ │ device │
-└────────────────────────────┴────────────────────────────────────────────┴─────────────────────────────────────────┘
+| Feature                     | How to trigger                                  | Requires                                  |
+| --------------------------- | ----------------------------------------------- | ----------------------------------------- |
+| Mic button (completion bar) | Click mic icon or `Cmd+Shift+A`                 | STT provider configured                   |
+| System audio daemon         | Click toggle in completion bar or `Cmd+Shift+M` | Nothing — just works                      |
+| Screenshot + audio          | Take screenshot while daemon is on              | Screenshot + daemon enabled               |
+| Chat audio recording        | Open a chat → click mic icon in input area      | STT provider configured                   |
+| VAD auto-record             | Enable in speech panel's mode switcher          | STT provider + system audio output device |
 
 Minimum setup for full testing: One AI provider API key + one STT provider API key + select audio devices.

@@ -5,7 +5,7 @@ import { CustomProviders } from "./CustomProvider";
 import { useApp } from "@/contexts";
 
 const STT_LANGUAGES = [
-  { code: "", label: "Auto-detect" },
+  { code: "auto", label: "Auto-detect" },
   { code: "en", label: "English" },
   { code: "zh", label: "Chinese" },
   { code: "de", label: "German" },

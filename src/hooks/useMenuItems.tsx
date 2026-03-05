@@ -73,7 +73,7 @@ export const useMenuItems = () => {
 
     {
       icon: PowerIcon,
-      label: "Quit nyx",
+      label: "Quit Nyx",
       action: async () => {
         await invoke("exit_app");
       },

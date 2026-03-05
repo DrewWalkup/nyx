@@ -38,7 +38,6 @@ const AutoSpeechVADInternal = ({
         // convert float32array to blob
         const audioBlob = floatArrayToWav(audio, 16000, "wav");
 
-        let transcription: string;
         const useNyxAPI = await shouldUseNyxAPI();
 
         // Check if we have a configured speech provider
@@ -68,15 +67,14 @@ const AutoSpeechVADInternal = ({
 
         setIsTranscribing(true);
 
-        // Use the fetchSTT function for all providers
-        transcription = await fetchSTT({
+        const sttResult = await fetchSTT({
           provider: useNyxAPI ? undefined : providerConfig,
           selectedProvider: selectedSttProvider,
           audio: audioBlob,
         });
 
-        if (transcription) {
-          submit(transcription);
+        if (sttResult.transcription) {
+          submit(sttResult.transcription);
         }
       } catch (error) {
         console.error("Failed to transcribe audio:", error);

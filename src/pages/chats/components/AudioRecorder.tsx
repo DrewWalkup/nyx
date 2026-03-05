@@ -154,14 +154,18 @@ export const AudioRecorder = ({
         (p) => p.id === selectedSttProvider.provider
       );
 
-      const text = await fetchSTT({
+      const sttResult = await fetchSTT({
         provider: useNyxAPI ? undefined : provider,
         selectedProvider: selectedSttProvider,
         audio: audioBlob,
         language: sttLanguage,
       });
 
-      onTranscriptionComplete(text);
+      if (sttResult.transcription) {
+        onTranscriptionComplete(sttResult.transcription);
+      } else {
+        onCancel();
+      }
     } catch (error) {
       console.error("Transcription failed:", error);
       onCancel();

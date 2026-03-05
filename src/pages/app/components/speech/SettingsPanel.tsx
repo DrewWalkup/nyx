@@ -25,6 +25,7 @@ import {
   PROMPT_TEMPLATES,
   getPromptTemplateById,
 } from "@/lib/platform-instructions";
+import { TYPE_PROVIDER } from "@/types";
 import { cn } from "@/lib/utils";
 
 // Sensitivity presets for simpler UX
@@ -60,6 +61,16 @@ interface SettingsPanelProps {
   setUseSystemPrompt: (value: boolean) => void;
   contextContent: string;
   setContextContent: (content: string) => void;
+  // AI Provider settings
+  allAiProviders: TYPE_PROVIDER[];
+  selectedAIProvider: {
+    provider: string;
+    variables: Record<string, string>;
+  };
+  onSetSelectedAIProvider: (data: {
+    provider: string;
+    variables: Record<string, string>;
+  }) => void;
 }
 
 export const SettingsPanel = ({
@@ -69,6 +80,9 @@ export const SettingsPanel = ({
   setUseSystemPrompt,
   contextContent,
   setContextContent,
+  allAiProviders,
+  selectedAIProvider,
+  onSetSelectedAIProvider,
 }: SettingsPanelProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -80,7 +94,7 @@ export const SettingsPanel = ({
       if (
         Math.abs(vadConfig.sensitivity_rms - preset.sensitivity_rms) < 0.001 &&
         Math.abs(vadConfig.noise_gate_threshold - preset.noise_gate_threshold) <
-          0.001
+        0.001
       ) {
         return key as SensitivityPreset;
       }
@@ -183,7 +197,7 @@ export const SettingsPanel = ({
                   {currentPreset === "custom"
                     ? "Custom sensitivity values"
                     : SENSITIVITY_PRESETS[currentPreset as SensitivityPreset]
-                        .description}
+                      .description}
                 </p>
               </div>
             )}
@@ -217,22 +231,64 @@ export const SettingsPanel = ({
           {/* Context Section */}
           <div className="space-y-3 pt-3 border-t border-border/50">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              AI Context
+              AI Configuration
             </h4>
 
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <Label className="text-xs font-medium">Use System Prompt</Label>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {useSystemPrompt
-                    ? "Using default prompt from settings"
-                    : "Using custom context below"}
-                </p>
+            {/* Provider Selector */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">AI Model</Label>
+              <Select
+                value={selectedAIProvider.provider}
+                onValueChange={(value) =>
+                  onSetSelectedAIProvider({ provider: value, variables: {} })
+                }
+              >
+                <SelectTrigger className="w-full h-8 text-xs">
+                  <SelectValue placeholder="Select AI Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel className="text-xs py-1">
+                      Available Models
+                    </SelectLabel>
+                    {allAiProviders.map((provider) => {
+                      if (!provider.id) return null;
+                      const displayName =
+                        provider.id.charAt(0).toUpperCase() +
+                        provider.id.slice(1);
+                      return (
+                        <SelectItem
+                          key={provider.id}
+                          value={provider.id}
+                          className="text-xs"
+                        >
+                          {displayName}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Context
+              </Label>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <Label className="text-xs font-medium">Use System Prompt</Label>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {useSystemPrompt
+                      ? "Using default prompt from settings"
+                      : "Using custom context below"}
+                  </p>
+                </div>
+                <Switch
+                  checked={useSystemPrompt}
+                  onCheckedChange={setUseSystemPrompt}
+                />
               </div>
-              <Switch
-                checked={useSystemPrompt}
-                onCheckedChange={setUseSystemPrompt}
-              />
             </div>
 
             {/* Custom Context */}

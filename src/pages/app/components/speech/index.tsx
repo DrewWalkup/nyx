@@ -65,7 +65,13 @@ export const SystemAudio = (props: useSystemAudioType) => {
     scrollAreaRef,
   } = props;
 
-  const { hasActiveLicense, supportsImages } = useApp();
+  const {
+    hasActiveLicense,
+    supportsImages,
+    allAiProviders,
+    selectedAIProvider,
+    onSetSelectedAIProvider,
+  } = useApp();
 
   // View mode toggle
   const [conversationMode, setConversationMode] = useState(false);
@@ -365,6 +371,9 @@ export const SystemAudio = (props: useSystemAudioType) => {
                       setUseSystemPrompt={setUseSystemPrompt}
                       contextContent={contextContent}
                       setContextContent={setContextContent}
+                      allAiProviders={allAiProviders}
+                      selectedAIProvider={selectedAIProvider}
+                      onSetSelectedAIProvider={onSetSelectedAIProvider}
                     />
 
                     {/* Help/Keyboard Shortcuts */}

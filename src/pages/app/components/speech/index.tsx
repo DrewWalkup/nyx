@@ -5,6 +5,11 @@ import {
   PopoverTrigger,
   PopoverContent,
   ScrollArea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components";
 import {
   HeadphonesIcon,
@@ -12,6 +17,7 @@ import {
   LoaderIcon,
   AudioLinesIcon,
   CameraIcon,
+  GlobeIcon,
   PlusIcon,
   XIcon,
 } from "lucide-react";
@@ -71,6 +77,10 @@ export const SystemAudio = (props: useSystemAudioType) => {
     allAiProviders,
     selectedAIProvider,
     onSetSelectedAIProvider,
+    sttLanguage,
+    setSttLanguage,
+    targetLanguage,
+    setTargetLanguage,
   } = useApp();
 
   // View mode toggle
@@ -105,6 +115,20 @@ export const SystemAudio = (props: useSystemAudioType) => {
       setScreenshotImage(null);
     }
   }, [isProcessing, screenshotImage]);
+
+  // Auto-scroll to bottom when new AI response content arrives
+  useEffect(() => {
+    if (!lastAIResponse) return;
+    const scrollElement = scrollAreaRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]",
+    ) as HTMLElement;
+    if (scrollElement) {
+      scrollElement.scrollTo({
+        top: scrollElement.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [lastAIResponse, scrollAreaRef]);
 
   const handleToggleCapture = async () => {
     if (capturing) {
@@ -231,6 +255,59 @@ export const SystemAudio = (props: useSystemAudioType) => {
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Meeting Language Selector */}
+                  {!setupRequired && (
+                    <Select value={sttLanguage} onValueChange={setSttLanguage}>
+                      <SelectTrigger className="h-6 w-auto text-[10px] gap-1 px-2 min-w-0">
+                        <GlobeIcon className="w-3 h-3 flex-shrink-0" />
+                        <SelectValue placeholder="Auto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto" className="text-xs">Auto-detect</SelectItem>
+                        <SelectItem value="it" className="text-xs">Italian</SelectItem>
+                        <SelectItem value="en" className="text-xs">English</SelectItem>
+                        <SelectItem value="es" className="text-xs">Spanish</SelectItem>
+                        <SelectItem value="fr" className="text-xs">French</SelectItem>
+                        <SelectItem value="de" className="text-xs">German</SelectItem>
+                        <SelectItem value="pt" className="text-xs">Portuguese</SelectItem>
+                        <SelectItem value="zh" className="text-xs">Chinese</SelectItem>
+                        <SelectItem value="ja" className="text-xs">Japanese</SelectItem>
+                        <SelectItem value="ko" className="text-xs">Korean</SelectItem>
+                        <SelectItem value="ar" className="text-xs">Arabic</SelectItem>
+                        <SelectItem value="ru" className="text-xs">Russian</SelectItem>
+                        <SelectItem value="nl" className="text-xs">Dutch</SelectItem>
+                        <SelectItem value="pl" className="text-xs">Polish</SelectItem>
+                        <SelectItem value="tr" className="text-xs">Turkish</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {/* Target Language Selector */}
+                  {!setupRequired && (
+                    <Select value={targetLanguage} onValueChange={setTargetLanguage}>
+                      <SelectTrigger className="h-6 w-auto text-[10px] gap-1 px-2 min-w-0">
+                        <span className="text-[9px] text-muted-foreground">→</span>
+                        <SelectValue placeholder="English" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en" className="text-xs">English</SelectItem>
+                        <SelectItem value="it" className="text-xs">Italian</SelectItem>
+                        <SelectItem value="es" className="text-xs">Spanish</SelectItem>
+                        <SelectItem value="fr" className="text-xs">French</SelectItem>
+                        <SelectItem value="de" className="text-xs">German</SelectItem>
+                        <SelectItem value="pt" className="text-xs">Portuguese</SelectItem>
+                        <SelectItem value="zh" className="text-xs">Chinese</SelectItem>
+                        <SelectItem value="ja" className="text-xs">Japanese</SelectItem>
+                        <SelectItem value="ko" className="text-xs">Korean</SelectItem>
+                        <SelectItem value="ar" className="text-xs">Arabic</SelectItem>
+                        <SelectItem value="ru" className="text-xs">Russian</SelectItem>
+                        <SelectItem value="nl" className="text-xs">Dutch</SelectItem>
+                        <SelectItem value="pl" className="text-xs">Polish</SelectItem>
+                        <SelectItem value="tr" className="text-xs">Turkish</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+
                   {/* Screenshot Button */}
                   {hasActiveLicense && !setupRequired && supportsImages && (
                     <Button

@@ -16,6 +16,7 @@ import {
 	DEFAULT_QUICK_ACTIONS,
 	DEFAULT_SYSTEM_PROMPT,
 	STORAGE_KEYS,
+	getMeetingTranslatorPrompt,
 } from "@/config";
 import {
 	safeLocalStorage,
@@ -44,8 +45,24 @@ export interface VadConfig {
 /** Maximum age (ms) for a transcription to be considered a duplicate from VAD double-fires. */
 const TRANSCRIPTION_DEDUP_WINDOW_MS = 3000;
 
+/** Minimum number of words for a transcription to be worth sending to the LLM. */
+const MIN_TRANSCRIPTION_WORDS = 5;
+
+/**
+ * Returns true if the transcription is too short to be meaningful.
+ * Strips punctuation and extra whitespace, then checks word count.
+ */
+function isTranscriptionTooShort(text: string): boolean {
+	const cleaned = text
+		.replace(/[^\p{L}\p{N}\s]/gu, "") // Remove punctuation, keep letters/numbers/spaces
+		.replace(/\s+/g, " ") // Collapse whitespace
+		.trim();
+	const wordCount = cleaned.split(" ").filter(Boolean).length;
+	return wordCount < MIN_TRANSCRIPTION_WORDS;
+}
+
 // OPTIMIZED VAD defaults - matches backend exactly for perfect performance
-const DEFAULT_VAD_CONFIG: VadConfig = {
+export const DEFAULT_VAD_CONFIG: VadConfig = {
 	enabled: true,
 	hop_size: 1024,
 	sensitivity_rms: 0.012, // Much less sensitive - only real speech
@@ -117,10 +134,33 @@ export function useSystemAudio() {
 		systemPrompt,
 		selectedAudioDevices,
 		sttLanguage,
+		targetLanguage,
 	} = useApp();
-	const abortControllerRef = useRef<AbortController | null>(null);
 	const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const isSavingRef = useRef<boolean>(false);
+
+	/** Tracks concurrent STT calls so isProcessing stays true until all complete. */
+	const activeSTTCountRef = useRef<number>(0);
+
+	/** Monotonic sequence number stamped on each speech-detected event. */
+	const sequenceRef = useRef<number>(0);
+
+	/** Session ID incremented on stop — in-flight requests check this to avoid leaking into next session. */
+	const sessionIdRef = useRef<number>(0);
+
+	/** Set of active AbortControllers for in-flight LLM requests. */
+	const activeControllersRef = useRef<Set<AbortController>>(new Set());
+
+	/** Queue of transcriptions waiting for LLM processing. */
+	const processingQueueRef = useRef<
+		Array<{
+			seq: number;
+			sessionId: number;
+			transcription: string;
+			systemPrompt: string;
+		}>
+	>([]);
+	const isQueueProcessingRef = useRef<boolean>(false);
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 	/** Tracks recent transcriptions to prevent duplicate processing from VAD double-fires. */
@@ -313,6 +353,7 @@ export function useSystemAudio() {
 								return;
 							}
 
+							activeSTTCountRef.current += 1;
 							setIsProcessing(true);
 
 							// Add timeout wrapper for STT request (30 seconds)
@@ -353,29 +394,51 @@ export function useSystemAudio() {
 										return;
 									}
 
+									// Skip transcriptions that are too short to be meaningful
+									if (isTranscriptionTooShort(sttResult.transcription)) {
+										console.debug(
+											"Transcription too short, discarding:",
+											sttResult.transcription,
+										);
+										return;
+									}
+
 									setLastTranscription(sttResult.transcription);
 									setError("");
 
-									const effectiveSystemPrompt =
+									let effectiveSystemPrompt =
 										useSystemPrompt
 											? systemPrompt ||
 												DEFAULT_SYSTEM_PROMPT
 											: contextContent ||
 												DEFAULT_SYSTEM_PROMPT;
 
-									const previousMessages =
-										conversation.messages.map((msg) => {
-											return {
-												role: msg.role,
-												content: msg.content,
-											};
-										});
+									// If using Meeting Translator, rebuild with current target language
+									if (effectiveSystemPrompt.includes("real-time meeting interpreter")) {
+										effectiveSystemPrompt = getMeetingTranslatorPrompt(targetLanguage);
+									}
 
-									await processWithAI(
-										sttResult.transcription,
-										effectiveSystemPrompt,
-										previousMessages,
-									);
+									const seq = sequenceRef.current++;
+									const currentSessionId = sessionIdRef.current;
+
+									// Enqueue for sequential LLM processing
+									processingQueueRef.current.push({
+										seq,
+										sessionId: currentSessionId,
+										transcription: sttResult.transcription,
+										systemPrompt: effectiveSystemPrompt,
+									});
+
+									// Sort by sequence to correct STT completion order
+									processingQueueRef.current.sort((a, b) => a.seq - b.seq);
+
+									// Backpressure: drop oldest when queue exceeds cap
+									const MAX_QUEUE_SIZE = 5;
+									while (processingQueueRef.current.length > MAX_QUEUE_SIZE) {
+										processingQueueRef.current.shift();
+									}
+
+									processQueue();
 								} else {
 									console.debug("VAD triggered but no speech detected, discarding");
 								}
@@ -390,7 +453,10 @@ export function useSystemAudio() {
 						} catch (err) {
 							setError("Failed to process speech");
 						} finally {
-							setIsProcessing(false);
+							activeSTTCountRef.current -= 1;
+							if (activeSTTCountRef.current === 0) {
+								setIsProcessing(false);
+							}
 						}
 					},
 				);
@@ -481,9 +547,14 @@ export function useSystemAudio() {
 	const handleQuickActionClick = async (action: string) => {
 		setError("");
 
-		const effectiveSystemPrompt = useSystemPrompt
+		let effectiveSystemPrompt = useSystemPrompt
 			? systemPrompt || DEFAULT_SYSTEM_PROMPT
 			: contextContent || DEFAULT_SYSTEM_PROMPT;
+
+		// If using Meeting Translator, rebuild with current target language
+		if (effectiveSystemPrompt.includes("real-time meeting interpreter")) {
+			effectiveSystemPrompt = getMeetingTranslatorPrompt(targetLanguage);
+		}
 
 		// Include the most recent transcription in conversation history if it exists
 		let updatedMessages = [...conversation.messages];
@@ -567,11 +638,8 @@ export function useSystemAudio() {
 			prompt: string,
 			previousMessages: Message[],
 		) => {
-			if (abortControllerRef.current) {
-				abortControllerRef.current.abort();
-			}
-
-			abortControllerRef.current = new AbortController();
+			const controller = new AbortController();
+			activeControllersRef.current.add(controller);
 
 			try {
 				setIsAIProcessing(true);
@@ -641,12 +709,40 @@ export function useSystemAudio() {
 			} catch (err) {
 				setError("Failed to get AI response");
 			} finally {
+				activeControllersRef.current.delete(controller);
 				setIsAIProcessing(false);
-				// No auto-restart - user manually controls when to start next recording
 			}
 		},
 		[selectedAIProvider, allAiProviders, conversation.messages],
 	);
+
+	/** Drains the processing queue, running LLM calls sequentially in order. */
+	const processQueue = useCallback(async () => {
+		if (isQueueProcessingRef.current) return;
+		isQueueProcessingRef.current = true;
+
+		while (processingQueueRef.current.length > 0) {
+			const nextItem = processingQueueRef.current.shift();
+			if (!nextItem) break;
+
+			// Skip items from a previous session
+			if (nextItem.sessionId !== sessionIdRef.current) continue;
+
+			// Compute fresh context at dequeue time
+			const freshPreviousMessages = conversation.messages.map((msg) => ({
+				role: msg.role,
+				content: msg.content,
+			}));
+
+			await processWithAI(
+				nextItem.transcription,
+				nextItem.systemPrompt,
+				freshPreviousMessages,
+			);
+		}
+
+		isQueueProcessingRef.current = false;
+	}, [processWithAI, conversation.messages]);
 
 	const startCapture = useCallback(async () => {
 		try {
@@ -672,6 +768,9 @@ export function useSystemAudio() {
 				createdAt: 0,
 				updatedAt: 0,
 			});
+
+			// Reset sequence counter for new session
+			sequenceRef.current = 0;
 
 			setCapturing(true);
 			setIsPopoverOpen(true);
@@ -708,11 +807,18 @@ export function useSystemAudio() {
 
 	const stopCapture = useCallback(async () => {
 		try {
-			// Abort any ongoing AI requests
-			if (abortControllerRef.current) {
-				abortControllerRef.current.abort();
-				abortControllerRef.current = null;
+			// Invalidate current session so in-flight results are ignored
+			sessionIdRef.current += 1;
+
+			// Clear the processing queue
+			processingQueueRef.current = [];
+			isQueueProcessingRef.current = false;
+
+			// Abort all in-flight LLM requests
+			for (const controller of activeControllersRef.current) {
+				controller.abort();
 			}
+			activeControllersRef.current.clear();
 
 			// Stop the audio capture
 			await invoke<string>("stop_system_audio_capture");
@@ -819,9 +925,10 @@ export function useSystemAudio() {
 
 	useEffect(() => {
 		return () => {
-			if (abortControllerRef.current) {
-				abortControllerRef.current.abort();
+			for (const controller of activeControllersRef.current) {
+				controller.abort();
 			}
+			activeControllersRef.current.clear();
 			invoke("stop_system_audio_capture").catch(() => {});
 		};
 	}, []);

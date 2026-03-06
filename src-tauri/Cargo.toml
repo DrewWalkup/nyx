@@ -1,6 +1,6 @@
 [package]
 name = "nyx"
-version = "0.2.0"
+version = "0.2.1"
 description = "The Open Source Alternative to Cluely - A lightning-fast, privacy-first AI assistant that works seamlessly during meetings, interviews, and conversations."
 authors = ["Drew Walkup <drewwalkup@gmail.com>"]
 license = "GPL-3.0"

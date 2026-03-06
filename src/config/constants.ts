@@ -42,6 +42,72 @@ export const MARKDOWN_FORMATTING_INSTRUCTIONS = [
   "- Do not over-format. For simple conversational replies, use plain text.",
 ].join("\n");
 
+/** Maps ISO 639-1 codes to response settings IDs (e.g. "en" → "english"). */
+export const ISO_TO_RESPONSE_LANGUAGE: Record<string, string> = {
+	en: "english",
+	it: "italian",
+	es: "spanish",
+	fr: "french",
+	de: "german",
+	pt: "portuguese",
+	zh: "chinese",
+	ja: "japanese",
+	ko: "korean",
+	ar: "arabic",
+	ru: "russian",
+	nl: "dutch",
+	pl: "polish",
+	tr: "turkish",
+};
+
+/** Maps response settings IDs to ISO 639-1 codes (e.g. "english" → "en"). */
+export const RESPONSE_LANGUAGE_TO_ISO: Record<string, string> = Object.fromEntries(
+	Object.entries(ISO_TO_RESPONSE_LANGUAGE).map(([iso, name]) => [name, iso]),
+);
+
+export const LANGUAGE_NAMES: Record<string, string> = {
+	en: "English",
+	it: "Italian",
+	es: "Spanish",
+	fr: "French",
+	de: "German",
+	pt: "Portuguese",
+	zh: "Chinese",
+	ja: "Japanese",
+	ko: "Korean",
+	ar: "Arabic",
+	ru: "Russian",
+	nl: "Dutch",
+	pl: "Polish",
+	tr: "Turkish",
+};
+
+export const getMeetingTranslatorPrompt = (targetLanguage: string): string => {
+	const targetName = LANGUAGE_NAMES[targetLanguage] || "English";
+
+	return `You are a real-time meeting interpreter. Your sole job is to translate speech into ${targetName} accurately and immediately.
+
+Rules:
+- Translate what was said into ${targetName}. Do not summarize, comment, or add your own thoughts.
+- Preserve the speaker's tone and intent (formal, casual, urgent, etc.).
+- If a phrase is ambiguous, translate the most likely meaning in context.
+- For proper nouns, company names, and technical terms, keep the original alongside a translation if helpful.
+- Keep translations concise — the user is reading in real-time during a live meeting.
+- If the input is already in ${targetName}, pass it through unchanged.
+- Never say "I don't understand" or ask clarifying questions — just translate what you received.`;
+};
+
+export const DEFAULT_SYSTEM_PROMPTS = [
+	{
+		name: "General Assistant",
+		prompt: DEFAULT_SYSTEM_PROMPT,
+	},
+	{
+		name: "Meeting Translator",
+		prompt: getMeetingTranslatorPrompt("en"),
+	},
+];
+
 export const DEFAULT_QUICK_ACTIONS = [
   "What should I say?",
   "Follow-up questions",

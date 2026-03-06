@@ -147,6 +147,8 @@ async fn run_vad_capture(
     let mut silence_chunks = 0;
     let mut speech_chunks = 0;
     let max_samples = sr as usize * 30; // 30s safety cap per utterance
+    let mut bandpass = BandpassFilter::new(sr);
+    let mut vad_buffer = vec![0.0f32; config.hop_size];
 
     while let Some(sample) = stream.next().await {
         buffer.push_back(sample);
@@ -163,7 +165,9 @@ async fn run_vad_capture(
             // Apply noise gate BEFORE VAD (critical for accuracy)
             let mono = apply_noise_gate(&mono, config.noise_gate_threshold);
 
-            let (rms, peak) = calculate_audio_metrics(&mono);
+            // Bandpass filter for VAD decision-making only (keeps speech frequencies 300-3000 Hz)
+            bandpass.process(&mono, &mut vad_buffer);
+            let (rms, peak) = calculate_audio_metrics(&vad_buffer);
             let is_speech = rms > config.sensitivity_rms || peak > config.peak_threshold;
 
             if is_speech {
@@ -357,6 +361,53 @@ async fn run_continuous_capture(
     }
 
     let _ = app.emit("continuous-recording-stopped", ());
+}
+
+/// Stateful bandpass filter for human speech frequencies (300-3000 Hz).
+/// Persists filter state across audio chunks to avoid edge artifacts.
+struct BandpassFilter {
+    alpha_high: f32,
+    alpha_low: f32,
+    prev_input: f32,
+    prev_high: f32,
+    prev_low: f32,
+}
+
+impl BandpassFilter {
+    fn new(sample_rate: u32) -> Self {
+        let dt = 1.0 / sample_rate as f32;
+
+        let rc_high = 1.0 / (2.0 * std::f32::consts::PI * 300.0);
+        let alpha_high = rc_high / (rc_high + dt);
+
+        let rc_low = 1.0 / (2.0 * std::f32::consts::PI * 3000.0);
+        let alpha_low = dt / (rc_low + dt);
+
+        Self {
+            alpha_high,
+            alpha_low,
+            prev_input: 0.0,
+            prev_high: 0.0,
+            prev_low: 0.0,
+        }
+    }
+
+    /// Filter a chunk of samples into the output slice.
+    /// Maintains state between calls for correct frequency response.
+    fn process(&mut self, samples: &[f32], output: &mut [f32]) {
+        for (i, &sample) in samples.iter().enumerate() {
+            // High-pass
+            let high = self.alpha_high * (self.prev_high + sample - self.prev_input);
+            self.prev_input = sample;
+            self.prev_high = high;
+
+            // Low-pass
+            let low = self.prev_low + self.alpha_low * (high - self.prev_low);
+            self.prev_low = low;
+
+            output[i] = low;
+        }
+    }
 }
 
 // Apply noise gate

@@ -3,6 +3,9 @@ import { Markdown, Switch, CopyButton } from "@/components";
 import { BotIcon, HeadphonesIcon, Loader2, SparklesIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/** Gap (ms) between consecutive user messages that triggers a "new turn" separator. */
+const TURN_GAP_MS = 2000;
+
 type Props = {
   lastTranscription: string;
   lastAIResponse: string;
@@ -53,24 +56,41 @@ export const ResultsSection = ({
         </div>
       </div>
 
-      {/* RESPONSE MODE: System as text, then AI response */}
+      {/* RESPONSE MODE: Rolling subtitle display */}
       {!conversationMode && (
-        <div className="space-y-2">
-          {/* System Input - Just text with bold label */}
-          {lastTranscription && (
-            <p className="text-[11px] text-muted-foreground">
-              <span className="font-semibold">System:</span> {lastTranscription}
-            </p>
+        <div className="space-y-1.5">
+          {/* Rolling history — older assistant responses, faded */}
+          {conversation.messages.length > 2 && (
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {conversation.messages
+                .slice(2) // Skip the latest pair (shown below)
+                .sort((a, b) => a.timestamp - b.timestamp) // Oldest first
+                .slice(-6) // Show last 6 historical messages (3 pairs)
+                .filter((message) => message.role === "assistant")
+                .map((message, index) => (
+                  <div
+                    key={message.id || index}
+                    className="text-[10px] text-muted-foreground/60 leading-relaxed prose prose-sm max-w-none dark:prose-invert"
+                  >
+                    <Markdown>{message.content}</Markdown>
+                  </div>
+                ))}
+            </div>
           )}
 
-          {/* AI Response */}
+          {/* Current segment — highlighted */}
+          {lastTranscription && (
+            <p className="text-[10px] text-muted-foreground/70 border-t border-border/30 pt-1">
+              <span className="font-semibold">Heard:</span> {lastTranscription}
+            </p>
+          )}
           {hasResponse && (
-            <div>
+            <div className="text-sm font-medium">
               {isAIProcessing && !lastAIResponse ? (
-                <div className="flex items-center gap-2 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <div className="flex items-center gap-2 py-1">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                   <span className="text-xs text-muted-foreground">
-                    Generating response...
+                    Translating...
                   </span>
                 </div>
               ) : (
@@ -129,7 +149,7 @@ export const ResultsSection = ({
             </div>
           )}
 
-          {/* Previous Messages */}
+          {/* Previous Messages with Turn Separators */}
           {hasHistory && (
             <div className="space-y-2 pt-2 border-t border-border/50">
               <p className="text-[9px] text-muted-foreground uppercase tracking-wide">
@@ -139,24 +159,45 @@ export const ResultsSection = ({
                 {conversation.messages
                   .slice(2)
                   .sort((a, b) => b.timestamp - a.timestamp)
-                  .map((message, index) => (
-                    <div
-                      key={message.id || index}
-                      className={cn(
-                        "p-2 rounded-md text-[11px]",
-                        message.role === "user"
-                          ? "bg-primary/5 border-l-2 border-primary/30"
-                          : "bg-background/50"
-                      )}
-                    >
-                      <span className="text-[8px] font-medium text-muted-foreground uppercase">
-                        {message.role === "user" ? "System" : "AI"}
-                      </span>
-                      <div className="text-muted-foreground leading-relaxed mt-0.5">
-                        <Markdown>{message.content}</Markdown>
+                  .map((message, index, sortedMessages) => {
+                    // Detect turn gaps: when a user message follows an AI message
+                    // and there's a >2s gap (comparing reverse-sorted timestamps)
+                    const previousMessage = sortedMessages[index - 1];
+                    const showTurnSeparator =
+                      previousMessage &&
+                      message.role === "user" &&
+                      previousMessage.role !== "user" &&
+                      previousMessage.timestamp - message.timestamp > TURN_GAP_MS;
+
+                    return (
+                      <div key={message.id || index}>
+                        {showTurnSeparator && (
+                          <div className="flex items-center gap-2 py-1">
+                            <div className="flex-1 border-t border-border/30" />
+                            <span className="text-[8px] text-muted-foreground/50 uppercase tracking-wider">
+                              new turn
+                            </span>
+                            <div className="flex-1 border-t border-border/30" />
+                          </div>
+                        )}
+                        <div
+                          className={cn(
+                            "p-2 rounded-md text-[11px]",
+                            message.role === "user"
+                              ? "bg-primary/5 border-l-2 border-primary/30"
+                              : "bg-background/50"
+                          )}
+                        >
+                          <span className="text-[8px] font-medium text-muted-foreground uppercase">
+                            {message.role === "user" ? "System" : "AI"}
+                          </span>
+                          <div className="text-muted-foreground leading-relaxed mt-0.5">
+                            <Markdown>{message.content}</Markdown>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           )}

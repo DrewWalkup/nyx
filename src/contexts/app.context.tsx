@@ -3,7 +3,10 @@ import {
 	DEFAULT_SYSTEM_PROMPT,
 	SPEECH_TO_TEXT_PROVIDERS,
 	STORAGE_KEYS,
+	ISO_TO_RESPONSE_LANGUAGE,
+	RESPONSE_LANGUAGE_TO_ISO,
 } from "@/config";
+import { getResponseSettings, updateLanguage as updateResponseLanguage } from "@/lib/storage/response-settings.storage";
 import { getPlatform, safeLocalStorage } from "@/lib";
 import { getShortcutsConfig } from "@/lib/storage";
 import {
@@ -326,6 +329,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 		safeLocalStorage.setItem(STORAGE_KEYS.STT_LANGUAGE, language);
 	};
 
+	// Target language — linked to Response Language setting (single source of truth)
+	const [targetLanguage, setTargetLanguageState] = useState<string>(() => {
+		const responseSettings = getResponseSettings();
+		return RESPONSE_LANGUAGE_TO_ISO[responseSettings.language] || "en";
+	});
+
+	const setTargetLanguage = (isoCode: string) => {
+		setTargetLanguageState(isoCode);
+		// Sync to response settings (the shared source of truth)
+		const responseLanguageId = ISO_TO_RESPONSE_LANGUAGE[isoCode];
+		if (responseLanguageId) {
+			updateResponseLanguage(responseLanguageId);
+		}
+	};
+
 	// Model speed toggle state (fast/slow) — session-scoped, defaults to "fast"
 	const [modelSpeed, setModelSpeed] = useState<"fast" | "slow">("fast");
 
@@ -555,6 +573,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 		if (savedSttLanguage) {
 			setSttLanguageState(savedSttLanguage);
 		}
+
+		// Sync target language from response settings
+		const currentResponseSettings = getResponseSettings();
+		const isoFromResponse = RESPONSE_LANGUAGE_TO_ISO[currentResponseSettings.language] || "en";
+		setTargetLanguageState(isoFromResponse);
 	};
 
 	const updateCursor = (type: CursorType | undefined) => {
@@ -705,7 +728,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 				e.key === STORAGE_KEYS.SCREENSHOT_CONFIG ||
 				e.key === STORAGE_KEYS.SYSTEM_AUDIO_DAEMON_CONFIG ||
 				e.key === STORAGE_KEYS.CUSTOMIZABLE ||
-				e.key === STORAGE_KEYS.STT_LANGUAGE
+				e.key === STORAGE_KEYS.STT_LANGUAGE ||
+				e.key === STORAGE_KEYS.RESPONSE_SETTINGS
 			) {
 				loadData();
 			}
@@ -1067,6 +1091,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 		setScreenRecordingPermission,
 		sttLanguage,
 		setSttLanguage,
+		targetLanguage,
+		setTargetLanguage,
 		modelSpeed,
 		setModelSpeed,
 	};

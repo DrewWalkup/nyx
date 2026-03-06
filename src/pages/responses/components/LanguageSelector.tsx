@@ -4,9 +4,10 @@ import { useApp } from "@/contexts";
 import { updateLanguage } from "@/lib/storage/response-settings.storage";
 import { useState, useEffect, useMemo } from "react";
 import { getResponseSettings } from "@/lib";
+import { RESPONSE_LANGUAGE_TO_ISO } from "@/config/constants";
 
 export const LanguageSelector = () => {
-  const { hasActiveLicense } = useApp();
+  const { hasActiveLicense, setTargetLanguage } = useApp();
   const [selectedLanguage, setSelectedLanguage] = useState<string>("english");
 
   useEffect(() => {
@@ -20,6 +21,11 @@ export const LanguageSelector = () => {
     }
     setSelectedLanguage(languageId);
     updateLanguage(languageId);
+    // Sync to target language (linked setting)
+    const isoCode = RESPONSE_LANGUAGE_TO_ISO[languageId];
+    if (isoCode) {
+      setTargetLanguage(isoCode);
+    }
   };
 
   const languageOptions = useMemo(() => {

@@ -71,6 +71,8 @@ export type IContextType = {
 	setSupportsImages: (value: boolean) => void;
 	sttLanguage: string;
 	setSttLanguage: (language: string) => void;
+	targetLanguage: string;
+	setTargetLanguage: (language: string) => void;
 	modelSpeed: "fast" | "slow";
 	setModelSpeed: (speed: "fast" | "slow") => void;
 };

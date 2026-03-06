@@ -10,7 +10,11 @@ import type {
 	SystemPromptInput,
 	UpdateSystemPromptInput,
 } from "@/types";
-import { DEFAULT_SYSTEM_PROMPT, STORAGE_KEYS } from "@/config";
+import {
+	DEFAULT_SYSTEM_PROMPT,
+	DEFAULT_SYSTEM_PROMPTS,
+	STORAGE_KEYS,
+} from "@/config";
 import { safeLocalStorage } from "@/lib";
 import { useApp } from "@/contexts";
 
@@ -36,6 +40,34 @@ export const useSystemPrompts = () => {
 			setIsLoading(true);
 			setError(null);
 			const result = await getAllSystemPrompts();
+
+			if (result.length === 0) {
+				// First launch — seed default prompts
+				for (const defaultPrompt of DEFAULT_SYSTEM_PROMPTS) {
+					await createSystemPrompt(defaultPrompt);
+				}
+				const seededPrompts = await getAllSystemPrompts();
+				setPrompts(seededPrompts);
+
+				// Auto-select the General Assistant prompt
+				const generalAssistant = seededPrompts.find(
+					(prompt) => prompt.name === "General Assistant",
+				);
+				if (generalAssistant) {
+					setSystemPrompt(generalAssistant.prompt);
+					setSelectedPromptId(generalAssistant.id);
+					safeLocalStorage.setItem(
+						STORAGE_KEYS.SYSTEM_PROMPT,
+						generalAssistant.prompt,
+					);
+					safeLocalStorage.setItem(
+						STORAGE_KEYS.SELECTED_SYSTEM_PROMPT_ID,
+						generalAssistant.id.toString(),
+					);
+				}
+				return;
+			}
+
 			setPrompts(result);
 		} catch (err) {
 			const errorMessage =
